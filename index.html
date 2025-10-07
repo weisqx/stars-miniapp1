@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Stars Bot</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{
+    --bg:#fff; --fg:#0f1419; --muted:#6b7280; --accent:#2ea6ff;
+    --card:#f6f7f9; --border:#e5e7eb; --btn:#31a3f1; --btnText:#fff;
+  }
+  *{box-sizing:border-box} html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial}
+  .shell{max-width:420px;margin:0 auto;padding:18px}
+  header{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  header .close{font-size:14px;color:#a0a6ad}
+  header .title{margin:0 auto 0 0;font-weight:700}
+  header .menu{width:22px;height:22px;border-radius:999px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:#a0a6ad}
+  h1{font-size:22px;margin:6px 0 2px}
+  .sub{color:#6b7280;font-size:14px;margin:0 0 16px}
+  .card{background:var(--card);border-radius:16px;padding:16px;border:1px solid var(--border)}
+  label{display:block;font-size:13px;margin:10px 0 6px;color:#374151}
+  select,input{width:100%;padding:12px 12px;border:1px solid var(--border);border-radius:12px;background:#fff;font-size:16px;outline:none}
+  .row{display:flex;gap:10px}
+  .row .code{flex:0 0 120px}
+  .row .phone{flex:1}
+  .actions{display:flex;justify-content:space-between;gap:12px;margin-top:18px}
+  .btn{flex:1;padding:13px 14px;border-radius:12px;border:none;font-weight:700;cursor:pointer}
+  .btn.secondary{background:#eef3f7;color:#111}
+  .btn.primary{background:var(--btn);color:var(--btnText)}
+  .hint, .warn{font-size:12px;margin-top:10px}
+  .hint{color:#7b8691} .warn{color:#b45309}
+  .select-wrap{position:relative}
+  .select-wrap:after{content:"▾";position:absolute;right:12px;top:50%;transform:translateY(-50%);color:#9aa2a9;font-size:12px;pointer-events:none}
+  .brand{display:flex;align-items:center;gap:10px;margin-top:4px;margin-bottom:8px}
+  .brand .logos{display:flex;align-items:center;gap:10px}
+  .logo-circle{width:34px;height:34px;border-radius:50%;background:#e9f4ff;display:flex;align-items:center;justify-content:center;font-weight:800;color:#1b98ff}
+  a{color:#1b98ff;text-decoration:none}
+  @media(prefers-color-scheme:dark){
+    :root{--bg:#0e141a;--fg:#e7edf3;--muted:#9aa6b2;--accent:#38b6ff;--card:#141c23;--border:#1f2a34;--btn:#2a9cf0;--btnText:#fff}
+    select,input{background:#0f151b;color:var(--fg);border-color:#26323d}
+    .select-wrap:after{color:#5e6b76}
+    .btn.secondary{background:#1a242e;color:#e7edf3}
+    .logo-circle{background:#102331;color:#59bfff}
+  }
+</style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="close">Закрыть</div>
+      <div class="title">Stars Bot</div>
+      <div class="menu">⋯</div>
+    </header>
+
+    <div class="brand">
+      <div class="logos">
+        <div class="logo-circle">TG</div>
+        <div style="font-size:20px;opacity:.6">→</div>
+        <div class="logo-circle">FR</div>
+      </div>
+    </div>
+
+    <h1>Войдите, чтобы использовать аккаунт Telegram</h1>
+    <p class="sub">
+      для <a href="https://fragment.com" target="_blank" rel="noopener">fragment.com</a> и Fragment Auction Alerts.
+      Введите свой <b>номер телефона</b> в международном формате. Подтверждение будет отправлено в Telegram.
+    </p>
+
+    <div class="card">
+      <label>Страна</label>
+      <div class="select-wrap">
+        <select id="countrySelect" autocomplete="country"></select>
+      </div>
+
+      <div class="row">
+        <div class="code">
+          <label>Код</label>
+          <input id="dialCode" inputmode="numeric" autocomplete="tel-country-code" value="+7" />
+        </div>
+        <div class="phone">
+          <label>Телефон</label>
+          <input id="phone" inputmode="tel" autocomplete="tel" placeholder="9 123 456-78-90" />
+        </div>
+      </div>
+
+      <div id="multiWarn" class="warn" style="display:none"></div>
+
+      <div class="actions">
+        <button class="btn secondary" id="cancelBtn">ОТМЕНА</button>
+        <button class="btn primary" id="nextBtn">ДАЛЕЕ</button>
+      </div>
+
+      <div class="hint">Можно стереть «+7», ввести «+код» — если код уникальный, страна выберется автоматически. При неоднозначном коде выберите страну вручную.</div>
+    </div>
+  </div>
+
+<script>
+/* Полный перечень стран с телефонными кодами E.164.
+   Для кодов, разделяемых несколькими странами (например, +1, +7), все страны присутствуют с ОДНИМ и тем же кодом. */
+const COUNTRIES = [
+  {name:"Австралия", code:"+61"}, {name:"Австрия", code:"+43"}, {name:"Азербайджан", code:"+994"},
+  {name:"Албания", code:"+355"}, {name:"Алжир", code:"+213"}, {name:"Ангола", code:"+244"},
+  {name:"Андорра", code:"+376"}, {name:"Антигуа и Барбуда", code:"+1"},
+  {name:"Аргентина", code:"+54"}, {name:"Армения", code:"+374"}, {name:"Афганистан", code:"+93"},
+  {name:"Багамские Острова", code:"+1"}, {name:"Бангладеш", code:"+880"}, {name:"Барбадос", code:"+1"},
+  {name:"Бахрейн", code:"+973"}, {name:"Беларусь", code:"+375"}, {name:"Белиз", code:"+501"},
+  {name:"Бельгия", code:"+32"}, {name:"Бенин", code:"+229"}, {name:"Бермуды", code:"+1"},
+  {name:"Болгария", code:"+359"}, {name:"Боливия", code:"+591"}, {name:"Босния и Герцеговина", code:"+387"},
+  {name:"Ботсвана", code:"+267"}, {name:"Бразилия", code:"+55"}, {name:"Бруней", code:"+673"},
+  {name:"Буркина-Фасо", code:"+226"}, {name:"Бурунди", code:"+257"}, {name:"Бутан", code:"+975"},
+  {name:"Вануату", code:"+678"}, {name:"Ватикан", code:"+379"}, {name:"Великобритания", code:"+44"},
+  {name:"Венгрия", code:"+36"}, {name:"Венесуэла", code:"+58"}, {name:"Восточный Тимор", code:"+670"},
+  {name:"Вьетнам", code:"+84"},
+  {name:"Габон", code:"+241"}, {name:"Гаити", code:"+509"}, {name:"Гайана", code:"+592"},
+  {name:"Гамбия", code:"+220"}, {name:"Гана", code:"+233"}, {name:"Гватемала", code:"+502"},
+  {name:"Гвинея", code:"+224"}, {name:"Гвинея-Бисау", code:"+245"}, {name:"Германия", code:"+49"},
+  {name:"Гибралтар", code:"+350"}, {name:"Гондурас", code:"+504"}, {name:"Гонконг", code:"+852"},
+  {name:"Гренада", code:"+1"}, {name:"Греция", code:"+30"}, {name:"Грузия", code:"+995"},
+  {name:"Дания", code:"+45"}, {name:"Джибути", code:"+253"}, {name:"Доминика", code:"+1"},
+  {name:"Доминиканская Республика", code:"+1"},
+  {name:"Египет", code:"+20"}, {name:"Замбия", code:"+260"}, {name:"Зимбабве", code:"+263"},
+  {name:"Израиль", code:"+972"}, {name:"Индия", code:"+91"}, {name:"Индонезия", code:"+62"},
+  {name:"Иордания", code:"+962"}, {name:"Ирак", code:"+964"}, {name:"Иран", code:"+98"},
+  {name:"Ирландия", code:"+353"}, {name:"Исландия", code:"+354"}, {name:"Испания", code:"+34"},
+  {name:"Италия", code:"+39"}, {name:"Йемен", code:"+967"},
+  {name:"Кабо-Верде", code:"+238"}, {name:"Казахстан", code:"+70"}, {name:"Камбоджа", code:"+855"},
+  {name:"Камерун", code:"+237"}, {name:"Канада", code:"+1"}, {name:"Катар", code:"+974"},
+  {name:"Кения", code:"+254"}, {name:"Кипр", code:"+357"}, {name:"Киргизия", code:"+996"},
+  {name:"Кирибати", code:"+686"}, {name:"Китай", code:"+86"}, {name:"КНДР", code:"+850"},
+  {name:"Колумбия", code:"+57"}, {name:"Коморы", code:"+269"}, {name:"Коста-Рика", code:"+506"},
+  {name:"Кот-д’Ивуар", code:"+225"}, {name:"Куба", code:"+53"}, {name:"Кувейт", code:"+965"},
+  {name:"Лаос", code:"+856"}, {name:"Латвия", code:"+371"}, {name:"Лесото", code:"+266"},
+  {name:"Либерия", code:"+231"}, {name:"Ливан", code:"+961"}, {name:"Ливия", code:"+218"},
+  {name:"Литва", code:"+370"}, {name:"Лихтенштейн", code:"+423"}, {name:"Люксембург", code:"+352"},
+  {name:"Маврикий", code:"+230"}, {name:"Мавритания", code:"+222"}, {name:"Мадагаскар", code:"+261"},
+  {name:"Македония", code:"+389"}, {name:"Малави", code:"+265"}, {name:"Малайзия", code:"+60"},
+  {name:"Мали", code:"+223"}, {name:"Мальдивы", code:"+960"}, {name:"Мальта", code:"+356"},
+  {name:"Марокко", code:"+212"}, {name:"Мексика", code:"+52"}, {name:"Мозамбик", code:"+258"},
+  {name:"Молдова", code:"+373"}, {name:"Монако", code:"+377"}, {name:"Монголия", code:"+976"},
+  {name:"Мьянма", code:"+95"},
+  {name:"Намибия", code:"+264"}, {name:"Непал", code:"+977"}, {name:"Нигер", code:"+227"},
+  {name:"Нигерия", code:"+234"}, {name:"Нидерланды", code:"+31"}, {name:"Никарагуа", code:"+505"},
+  {name:"Новая Зеландия", code:"+64"}, {name:"Норвегия", code:"+47"},
+  {name:"ОАЭ", code:"+971"}, {name:"Оман", code:"+968"},
+  {name:"Пакистан", code:"+92"}, {name:"Палестина", code:"+970"}, {name:"Панама", code:"+507"},
+  {name:"Папуа — Новая Гвинея", code:"+675"}, {name:"Парагвай", code:"+595"}, {name:"Перу", code:"+51"},
+  {name:"Польша", code:"+48"}, {name:"Португалия", code:"+351"},
+  {name:"Россия", code:"+7"}, {name:"Руанда", code:"+250"}, {name:"Румыния", code:"+40"},
+  {name:"Сальвадор", code:"+503"}, {name:"Самоа", code:"+685"}, {name:"Сан-Марино", code:"+378"},
+  {name:"Саудовская Аравия", code:"+966"}, {name:"Северный Кипр", code:"+90"}, {name:"Сейшелы", code:"+248"},
+  {name:"Сенегал", code:"+221"}, {name:"Сербия", code:"+381"}, {name:"Сингапур", code:"+65"},
+  {name:"Сирия", code:"+963"}, {name:"Словакия", code:"+421"}, {name:"Словения", code:"+386"},
+  {name:"Соединённые Штаты", code:"+1"}, {name:"Соломоновы Острова", code:"+677"}, {name:"Сомали", code:"+252"},
+  {name:"Судан", code:"+249"}, {name:"Суринам", code:"+597"}, {name:"Сьерра-Леоне", code:"+232"},
+  {name:"Таджикистан", code:"+992"}, {name:"Таиланд", code:"+66"}, {name:"Танзания", code:"+255"},
+  {name:"Того", code:"+228"}, {name:"Тринидад и Тобаго", code:"+1"}, {name:"Тунис", code:"+216"},
+  {name:"Туркменистан", code:"+993"}, {name:"Турция", code:"+90"},
+  {name:"Уганда", code:"+256"}, {name:"Узбекистан", code:"+998"}, {name:"Украина", code:"+380"},
+  {name:"Уругвай", code:"+598"},
+  {name:"Фиджи", code:"+679"}, {name:"Филиппины", code:"+63"}, {name:"Финляндия", code:"+358"},
+  {name:"Франция", code:"+33"},
+  {name:"Хорватия", code:"+385"},
+  {name:"ЦАР", code:"+236"}, {name:"Чад", code:"+235"}, {name:"Черногория", code:"+382"},
+  {name:"Чехия", code:"+420"}, {name:"Чили", code:"+56"},
+  {name:"Швейцария", code:"+41"}, {name:"Швеция", code:"+46"},
+  {name:"Шри-Ланка", code:"+94"},
+  {name:"Эквадор", code:"+593"}, {name:"Экваториальная Гвинея", code:"+240"}, {name:"Эритрея", code:"+291"},
+  {name:"Эсватини", code:"+268"}, {name:"Эстония", code:"+372"}, {name:"Эфиопия", code:"+251"},
+  {name:"ЮАР", code:"+27"}, {name:"Южная Корея", code:"+82"}, {name:"Южный Судан", code:"+211"},
+  {name:"Ямайка", code:"+1"}, {name:"Япония", code:"+81"}
+];
+
+const sel   = document.getElementById('countrySelect');
+const dial  = document.getElementById('dialCode');
+const phone = document.getElementById('phone');
+const warn  = document.getElementById('multiWarn');
+const btnCancel = document.getElementById('cancelBtn');
+const btnNext   = document.getElementById('nextBtn');
+
+// заполнение списка стран
+[...COUNTRIES].sort((a,b)=>a.name.localeCompare(b.name,'ru')).forEach(c=>{
+  const opt = document.createElement('option');
+  opt.value = c.code;
+  opt.textContent = `${c.name} (${c.code})`;
+  sel.appendChild(opt);
+});
+
+// начальные значения
+sel.value = "+7"; dial.value = "+7";
+
+function normalizeCode(v){
+  if(!v) return "";
+  v = v.replace(/\s+/g,'').replace(/[^0-9+]/g,'');
+  if(v[0] !== '+') v = '+'+v;
+  // код страны по E.164 до 4 цифр
+  return v.slice(0,5);
+}
+
+function listByExactDial(code){
+  return COUNTRIES.filter(c => c.code === code);
+}
+
+// выбор страны меняет код
+sel.addEventListener('change', ()=>{
+  dial.value = sel.value;
+  const same = listByExactDial(sel.value);
+  warn.style.display = (same.length > 1) ? 'block' : 'none';
+  if (same.length > 1) {
+    warn.textContent = `Код ${sel.value} используется несколькими странами: выберите нужную в списке.`;
+  }
+});
+
+// ввод кода: только при ОДНОЗНАЧНОМ совпадении выставляем страну
+dial.addEventListener('input', ()=>{
+  dial.value = normalizeCode(dial.value);
+  const exact = listByExactDial(dial.value);
+  if (exact.length === 1) {
+    sel.value = exact[0].code;
+    warn.style.display = 'none';
+  } else if (exact.length > 1) {
+    // неоднозначный код (например, +1 или +7)
+    warn.style.display = 'block';
+    warn.textContent = `Код ${dial.value} используется несколькими странами: выберите страну вручную.`;
+    // не меняем текущий выбор — оставляем пользователю решение
+  } else {
+    warn.style.display = 'none';
+    sel.value = ""; // ничего не выбрано
+  }
+});
+
+// кнопки
+btnCancel.addEventListener('click', ()=>{
+  if(window.Telegram?.WebApp){ Telegram.WebApp.close(); }
+  else alert('Закрыть мини-приложение можно в Telegram.');
+});
+
+btnNext.addEventListener('click', ()=>{
+  const code = normalizeCode(dial.value);
+  const number = phone.value.trim();
+  if(!/^\+\d{1,4}$/.test(code)){
+    alert('Введите корректный международный код (например, +7, +380, +49).');
+    return;
+  }
+  if(!number){
+    alert('Введите номер телефона.');
+    return;
+  }
+  if(window.Telegram?.WebApp){
+    Telegram.WebApp.showPopup({
+      title: 'Проверка',
+      message: `Код: ${code}\nТелефон: ${number}\n(Авторизация отключена по ТЗ)`,
+      buttons:[{id:'ok',type:'default',text:'ОК'}]
+    });
+  }else{
+    alert(`Код: ${code}\nТелефон: ${number}\n(Авторизация отключена по ТЗ)`);
+  }
+});
+</script>
+</body>
+</html>
